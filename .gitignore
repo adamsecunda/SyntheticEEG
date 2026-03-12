@@ -1,0 +1,99 @@
+# Python standard ignores
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+.venv/
+ENV/
+
+# Jupyter / IPython
+.ipynb_checkpoints/
+*.ipynb_checkpoints/
+
+# IDEs and editors
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# macOS junk
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows junk
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Logging, temporary files, crash dumps
+*.log
+*.logs
+*.tmp
+*.temp
+crash_reports/
+*.bak
+*.swp
+*~
+
+# Large data files & folders
+data/
+*.gdf
+*.mat              
+*.hdf5
+*.h5
+*.csv               
+*.parquet
+*.feather
+*.zip
+*.tar
+*.tar.gz
+*.7z
+
+# Machine learning / deep learning artifacts
+models/
+*.pth
+*.pt
+*.ckpt
+*.weights
+*.onnx
+*.pb
+*.tflite
+runs/             
+lightning_logs/
+wandb/
+mlruns/
+checkpoints/
+best_model*
+final_model*
+
+# Cache & temporary ML files
+.cache/
+__debug_output/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
