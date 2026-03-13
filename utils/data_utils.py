@@ -1,7 +1,8 @@
 from pathlib import Path
 import numpy as np
 import mne
-
+import torch
+from torch.utils.data import Dataset
 
 def _read_subject(path):
     """
@@ -95,3 +96,28 @@ def load_data(data_dir="data"):
     y_all = np.concatenate(y_list, axis=0)
 
     return X_all, y_all
+
+class EEGDataset(Dataset):
+    """
+    PyTorch Dataset for EEG motor imagery epochs.
+
+    Args:
+        X (np.ndarray): EEG epochs of shape (n_epochs, 22, 1001).
+        y (np.ndarray): Integer class labels of shape (n_epochs,).
+    """
+
+    def __init__(self, X, y):
+        # Z-score normalise each epoch and channel independently across time axis
+        mean = X.mean(axis=2, keepdims=True)
+        std = X.std(axis=2, keepdims=True)
+        # Epsilon (1e-8) ensures numerical stability
+        X = (X - mean) / (std + 1e-8)
+
+        self.X = torch.from_numpy(X)
+        self.y = torch.from_numpy(y).long()
+
+    def __len__(self):
+        return len(self.y)
+
+    def __getitem__(self, i):
+        return self.X[i], self.y[i]

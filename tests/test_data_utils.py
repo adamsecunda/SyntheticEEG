@@ -1,7 +1,8 @@
 from pathlib import Path
 import numpy as np
 import pytest
-from utils.data_utils import _read_subject, load_data
+import torch
+from utils.data_utils import _read_subject, load_data, EEGDataset
 
 DATA_DIR = Path("data")
 SUBJECTS = [DATA_DIR / f"A0{i}T.gdf" for i in range(1, 10)]
@@ -60,3 +61,36 @@ class TestLoadData:
         X_single, _ = _read_subject(SUBJECTS[0])
         X, _ = all_data
         assert X.shape[0] > X_single.shape[0]
+
+
+class TestEEGDataset:
+
+    @pytest.fixture(scope="class")
+    def dataset(self):
+        X, y = load_data(DATA_DIR)
+        return EEGDataset(X, y)
+
+    def test_length_matches_loaded_data(self, dataset):
+        X, _ = load_data(DATA_DIR)
+        assert len(dataset) == X.shape[0]
+
+    def test_item_shapes(self, dataset):
+        x, y = dataset[0]
+        assert x.shape == (22, 1001)
+        assert y.shape == ()
+
+    def test_X_is_float32_tensor(self, dataset):
+        x, _ = dataset[0]
+        assert x.dtype == torch.float32
+
+    def test_y_is_long_tensor(self, dataset):
+        _, y = dataset[0]
+        assert y.dtype == torch.long
+
+    def test_normalisation_mean_near_zero(self, dataset):
+        x, _ = dataset[0]
+        assert x.mean(dim=-1).abs().max() < 1e-5
+
+    def test_normalisation_std_near_one(self, dataset):
+        x, _ = dataset[0]
+        assert (x.std(dim=-1) - 1).abs().max() < 1e-2
