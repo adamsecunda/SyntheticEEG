@@ -121,3 +121,44 @@ class EEGDataset(Dataset):
 
     def __getitem__(self, i):
         return self.X[i], self.y[i]
+
+def create_imbalanced_dataset(X, y, target_class, removal_percentage):
+    """
+    Create a class-imbalanced dataset by removing a proportion of trials
+    from a single target class.
+
+    Args:
+        X (np.ndarray): EEG epochs of shape (n_epochs, 22, 1001)
+        y (np.ndarray): Integer class labels of shape (n_epochs,)
+        target_class (int): Class index to undersample (0-3)
+        removal_percentage (float): Proportion of target class trials to remove (0-1)
+
+    Returns:
+        X_imb (np.ndarray): Imbalanced epochs array
+        y_imb (np.ndarray): Imbalanced labels array
+    """
+    X_imb_list, y_imb_list = [], []
+
+    for class_idx in range(4):
+        class_mask = y == class_idx
+        X_class = X[class_mask]
+        y_class = y[class_mask]
+
+        # Keep all trials for non target classes
+        if class_idx != target_class:
+            X_imb_list.append(X_class)
+            y_imb_list.append(y_class)
+            continue
+
+        # Randomly subsample the target class
+        n_keep = int(len(y_class) * (1 - removal_percentage))
+        keep_idx = np.random.choice(len(y_class), size=n_keep, replace=False)
+        X_imb_list.append(X_class[keep_idx])
+        y_imb_list.append(y_class[keep_idx])
+
+    X_imb = np.concatenate(X_imb_list, axis=0)
+    y_imb = np.concatenate(y_imb_list, axis=0)
+
+    # Shuffle to avoid class ordering artefacts
+    shuffle_idx = np.random.permutation(len(y_imb))
+    return X_imb[shuffle_idx], y_imb[shuffle_idx]

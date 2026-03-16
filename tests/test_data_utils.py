@@ -2,10 +2,13 @@ from pathlib import Path
 import numpy as np
 import pytest
 import torch
-from utils.data_utils import _read_subject, load_data, EEGDataset
+from utils.data_utils import _read_subject, load_data, EEGDataset, create_imbalanced_dataset
 
 DATA_DIR = Path("data")
 SUBJECTS = [DATA_DIR / f"A0{i}T.gdf" for i in range(1, 10)]
+
+N_PER_CLASS = 100
+N_CLASSES = 4
 
 
 class TestReadSubject:
@@ -94,3 +97,45 @@ class TestEEGDataset:
     def test_normalisation_std_near_one(self, dataset):
         x, _ = dataset[0]
         assert (x.std(dim=-1) - 1).abs().max() < 1e-2
+
+
+class TestCreateImbalancedDataset:
+    """
+    Tests use a small notional balanced dataset of 400 trials
+    (100 per class) to test the imbalancing logic.
+    """
+
+    @pytest.fixture(scope="class")
+    def balanced_data(self):
+        X = np.random.randn(N_PER_CLASS * N_CLASSES, 22, 1001).astype("float32")
+        y = np.repeat(np.arange(N_CLASSES), N_PER_CLASS)
+        return X, y
+
+    @pytest.mark.parametrize("target_class", [0, 1, 2, 3])
+    @pytest.mark.parametrize("removal_pct", [0.5, 1.0])
+    def test_target_class_size(self, balanced_data, target_class, removal_pct):
+        X, y = balanced_data
+        _, y_imb = create_imbalanced_dataset(X, y, target_class, removal_pct)
+        expected = int(N_PER_CLASS * (1 - removal_pct))
+        assert (y_imb == target_class).sum() == expected
+
+    @pytest.mark.parametrize("target_class", [0, 1, 2, 3])
+    def test_non_target_classes_untouched(self, balanced_data, target_class):
+        X, y = balanced_data
+        _, y_imb = create_imbalanced_dataset(X, y, target_class, 0.5)
+        for class_idx in range(N_CLASSES):
+            if class_idx != target_class:
+                assert (y_imb == class_idx).sum() == N_PER_CLASS
+
+    @pytest.mark.parametrize("target_class", [0, 1, 2, 3])
+    def test_total_size(self, balanced_data, target_class):
+        X, y = balanced_data
+        X_imb, y_imb = create_imbalanced_dataset(X, y, target_class, 0.5)
+        expected = N_PER_CLASS * N_CLASSES - int(N_PER_CLASS * 0.5)
+        assert len(y_imb) == expected
+        assert X_imb.shape[0] == expected
+
+    def test_output_is_shuffled(self, balanced_data):
+        X, y = balanced_data
+        _, y_imb = create_imbalanced_dataset(X, y, 0, 0.5)
+        assert not np.all(y_imb == y_imb[0])
