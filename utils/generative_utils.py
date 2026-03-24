@@ -38,6 +38,7 @@ class Generator(nn.Module):
 
         self.embed   = nn.Embedding(n_classes, embed_dim)
         self.project = nn.Linear(noise_dim + embed_dim, 256 * 7)
+        self.drop = nn.Dropout(p=0.3)
 
         # Block 1: 256 x 7 -> 128 x 32
         self.conv1 = nn.ConvTranspose1d(256, 128, kernel_size=8,  stride=4, padding=0)
@@ -56,12 +57,16 @@ class Generator(nn.Module):
 
     def forward(self, z, labels):
         e = self.embed(labels)
+        
+        if self.training:
+            e = e + torch.randn_like(e) * 0.1
+        
         x = torch.relu(self.project(torch.cat([z, e], dim=1)))
         x = x.view(-1, 256, 7)
 
-        x = torch.relu(self.bn1(self.conv1(x)))
-        x = torch.relu(self.bn2(self.conv2(x)))
-        x = torch.relu(self.bn3(self.conv3(x)))
+        x = self.drop(torch.relu(self.bn1(self.conv1(x))))
+        x = self.drop(torch.relu(self.bn2(self.conv2(x))))
+        x = self.drop(torch.relu(self.bn3(self.conv3(x))))
         x = torch.tanh(self.conv4(x))
 
         return x[:, :, :N_TIMES]
@@ -207,6 +212,7 @@ def train_gan(X, y, n_epochs=200, lr_g=0.00001, lr_d=0.0001, verbose=True):
     np.random.seed(42)
     if device.type == "mps":
         torch.mps.manual_seed(42)
+        torch.use_deterministic_algorithms(True, warn_only=True)
     elif device.type == "cuda":
         torch.cuda.manual_seed(42)
         torch.backends.cudnn.deterministic = True
