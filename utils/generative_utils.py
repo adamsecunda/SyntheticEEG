@@ -201,8 +201,8 @@ def train_gan(X, y, n_epochs=200, lr_g=0.00001, lr_d=0.0001, verbose=True):
         X (np.ndarray): EEG epochs of shape (n_epochs, 22, 1001)
         y (np.ndarray): Integer class labels of shape (n_epochs,)
         n_epochs (int): Number of training epochs. Default: 200
-        lr_g (float): Generator learning rate. Default: 1e-4
-        lr_d (float): Critic learning rate. Default: 1e-4
+        lr_g (float): Generator learning rate. Default: 1e-5
+        lr_d (float): Critic learning rate. Default: 1e-5
         verbose (bool): Print training progress. Default: True
 
     Returns:
