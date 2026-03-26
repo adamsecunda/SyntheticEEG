@@ -25,11 +25,11 @@ def _read_subject(path):
     """
     raw = mne.io.read_raw_gdf(path, preload=True, verbose=False)
     raw.drop_channels([ch for ch in raw.ch_names if "EOG" in ch])
-    raw.set_eeg_reference("average")
-    raw.filter(0, 38, fir_design="firwin")
+    raw.set_eeg_reference("average", verbose=False)
+    raw.filter(0, 38, fir_design="firwin", verbose=False)
 
     # Parse annotations embedded in the GDF file into discrete events
-    events, event_dict = mne.events_from_annotations(raw)
+    events, event_dict = mne.events_from_annotations(raw, verbose=False)
     event_id = {}
 
     # Match annotation labels containing the class codes
@@ -51,7 +51,7 @@ def _read_subject(path):
     )
 
     # Extract epoch data as a 3D array: (n_epochs, 22, 1001)
-    X = epochs.get_data(copy=False)
+    X = epochs.get_data(copy=False, verbose=False)
     # Extract the event code (class label) for each epoch from the events array
     y = epochs.events[:, -1]
 

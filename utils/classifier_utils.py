@@ -93,7 +93,7 @@ class DeepConvNet(nn.Module):
         return self.fc(x.flatten(1))
 
 
-def train_model(X_train, y_train, n_epochs=150, lr=0.0005, verbose=True):
+def train_model(X_train, y_train, n_epochs=150, lr=0.0005, verbose=False):
     """
     Train a DeepConvNet on the provided EEG data.
 
@@ -102,7 +102,7 @@ def train_model(X_train, y_train, n_epochs=150, lr=0.0005, verbose=True):
         y_train (np.ndarray): Integer class labels of shape (n_epochs,)
         n_epochs (int): Maximum number of training epochs. Default: 150
         lr (float): Initial learning rate. Default: 0.0005
-        verbose (bool): Print training progress. Default: True
+        verbose (bool): Print training progress. Default: False
 
     Returns:
         best_acc (float): Best validation accuracy achieved during training

@@ -4,6 +4,7 @@ import torch
 from pathlib import Path
 from utils.data_utils import create_imbalanced_dataset
 from utils.classifier_utils import train_model, CLASS_NAMES
+from utils.generative_utils import generate_samples
 
 
 def _results_path(save_dir, tag):
@@ -79,3 +80,105 @@ def run_experiments(X, y, removal_percentages=[0.5, 1.0], target_classes=[0, 1, 
             _save(config_results, config_path)
 
     return results
+
+
+def run_tstr(generator, y, n_per_class=None):
+    if n_per_class is None:
+        n_per_class = len(y) // 4
+
+    X_syn_list, y_syn_list = [], []
+    for class_label in range(4):
+        samples = generate_samples(generator, class_label, n_per_class)
+        X_syn_list.append(samples)
+        y_syn_list.append(np.full(n_per_class, class_label))
+
+    X_syn = np.concatenate(X_syn_list, axis=0).astype('float32')
+    y_syn = np.concatenate(y_syn_list, axis=0)
+
+    print('TSTR — training classifier on synthetic data...')
+    best_acc, class_accs = train_model(X_syn, y_syn, verbose=False)
+
+    print(f'\nTSTR Results')
+    print(f'Overall accuracy - {best_acc:.3f}')
+    for i, name in enumerate(CLASS_NAMES):
+        print(f'{name} - {class_accs[i]:.3f}')
+
+    return best_acc, class_accs
+
+
+def run_augmentation_experiments(X, y, results, generator, save_dir='results'):
+    aug_results = {}
+    balanced_class_counts = {c: int((y == c).sum()) for c in range(4)}
+
+    for target_class in sorted(results['imbalanced'].keys()):
+        aug_results[target_class] = {}
+
+        for removal_pct in sorted(results['imbalanced'][target_class].keys()):
+            tag         = f'augmented_{target_class}_{int(float(removal_pct) * 100)}'
+            config_path = Path(save_dir) / f'{tag}.json'
+
+            if config_path.exists():
+                print(f'\n{CLASS_NAMES[target_class]} - {int(float(removal_pct) * 100)}% removed - loading saved results')
+                with open(config_path) as f:
+                    aug_results[target_class][removal_pct] = json.load(f)
+                continue
+
+            print(f'\n{CLASS_NAMES[target_class]} - {int(float(removal_pct) * 100)}% removed - augmenting...')
+
+            X_imb, y_imb = create_imbalanced_dataset(X, y, target_class, float(removal_pct))
+
+            n_removed = balanced_class_counts[target_class] - int(balanced_class_counts[target_class] * (1 - float(removal_pct)))
+            X_syn     = generate_samples(generator, target_class, n_removed)
+            y_syn     = np.full(n_removed, target_class)
+
+            X_aug = np.concatenate([X_imb, X_syn], axis=0).astype('float32')
+            y_aug = np.concatenate([y_imb, y_syn], axis=0)
+
+            acc, class_accs = train_model(X_aug, y_aug, verbose=False)
+
+            config_result = {'overall': acc, 'per_class': class_accs}
+            aug_results[target_class][removal_pct] = config_result
+
+            with open(config_path, 'w') as f:
+                json.dump(config_result, f, indent=2)
+
+    return aug_results
+
+def print_imbalance_results(results, aug_results=None, class_names=None):
+    if class_names is None:
+        class_names = ["Left", "Right", "Feet", "Tongue"]
+
+    # Header
+    print(f"{'Configuration':<28} {'Overall':>8} {'Left':>7} {'Right':>7} {'Feet':>7} {'Tongue':>7} {'Delta (pp)':>10}")
+    print("-" * 84)
+
+    # 1. Balanced baseline
+    b = results["balanced"]
+    print(f"{'Balanced baseline':<28} {b['overall']:>8.3f} "
+          f"{b['per_class'][0]:>7.3f} {b['per_class'][1]:>7.3f} "
+          f"{b['per_class'][2]:>7.3f} {b['per_class'][3]:>7.3f} {'-':>10}")
+
+    for target_class in sorted(results["imbalanced"].keys()):
+        for removal_pct in sorted(results["imbalanced"][target_class].keys()):
+            
+            # 2. Ablation Delta (A_imb - A_base)
+            r = results["imbalanced"][target_class][removal_pct]
+            a_base = b['per_class'][target_class]
+            a_imb = r['per_class'][target_class]
+            abl_delta = (a_imb - a_base) * 100
+            
+            tag = f"{class_names[target_class]} -{int(float(removal_pct)*100)}% rem"
+            print(f"{tag:<28} {r['overall']:>8.3f} "
+                  f"{r['per_class'][0]:>7.3f} {r['per_class'][1]:>7.3f} "
+                  f"{r['per_class'][2]:>7.3f} {r['per_class'][3]:>7.3f} {abl_delta:>9.1f}pp")
+
+            # 3. Augmentation Gain (A_aug - A_imb)
+            if aug_results and target_class in aug_results and removal_pct in aug_results[target_class]:
+                a = aug_results[target_class][removal_pct]
+                a_aug = a['per_class'][target_class]
+                aug_gain = (a_aug - a_imb) * 100
+                
+                tag = f"{class_names[target_class]} -{int(float(removal_pct)*100)}% aug"
+                print(f"{tag:<28} {a['overall']:>8.3f} "
+                      f"{a['per_class'][0]:>7.3f} {a['per_class'][1]:>7.3f} "
+                      f"{a['per_class'][2]:>7.3f} {a['per_class'][3]:>7.3f} {aug_gain:>+9.1f}pp")

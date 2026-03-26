@@ -1,30 +1,34 @@
-import numpy as np
-import matplotlib.pyplot as plt
+import logging
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
+
+import matplotlib.pyplot as plt
+from matplotlib.container import BarContainer
+import numpy as np
 from utils.classifier_utils import CLASS_NAMES
 
+# Constants for consistent styling across the project
 PLOT_STYLE = {
     "font.family": "sans-serif",
     "font.sans-serif": ["Arial", "Helvetica", "DejaVu Sans"],
     "font.size": 9,
-    "axes.labelsize": 9,
-    "xtick.labelsize": 8,
-    "ytick.labelsize": 8,
+    "axes.labelsize": 9.5,
+    "xtick.labelsize": 8.5,
+    "ytick.labelsize": 8.5,
     "legend.fontsize": 8,
-    "axes.linewidth": 0.8,
-    "xtick.major.width": 0.8,
-    "ytick.major.width": 0.8,
+    "axes.linewidth": 0.85,
+    "xtick.major.width": 0.85,
+    "ytick.major.width": 0.85,
     "pdf.fonttype": 42,
     "ps.fonttype": 42,
     "figure.dpi": 300,
     "savefig.dpi": 600,
 }
 
-# Paul Tol muted palette
 PALETTE = {
-    "balanced": {"face": "#4477AA", "edge": "#2B4F73"},
-    "removal_50": {"face": "#EE6677", "edge": "#A63D4A"},
-    "removal_100": {"face": "#CCBB44", "edge": "#8A7D2E"},
+    "balanced": {"facecolor": "#4477AA", "edgecolor": "#2B4F73"},
+    "imbalanced": {"facecolor": "#EE6677", "edgecolor": "#A63D4A"},
+    "augmented": {"facecolor": "#228833", "edgecolor": "#15531F"},
     "baseline_line": "#444444",
 }
 
@@ -33,26 +37,30 @@ FULL_CLASS_NAMES = [
 ]
 
 
-def _save(fig, save_dir, name):
+def _save(fig: plt.Figure, save_dir: Union[str, Path], name: str) -> None:
+    """Saves the figure as a high-resolution PDF and closes the plot."""
     path = Path(save_dir) / f"{name}.pdf"
-    fig.savefig(path, bbox_inches="tight", format="pdf")
-    print(f"Saved: {path}")
+    fig.savefig(path, bbox_inches="tight", format="pdf", dpi=600)
+    plt.close(fig)
 
 
-def _style_ax(ax):
-    """Standard axis styling applied consistently across all plots."""
+def _style_ax(ax: plt.Axes) -> None:
+    """Applies clean, consistent axis styling with percentage y-axis labels."""
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
-    ax.spines["left"].set_linewidth(0.8)
-    ax.spines["bottom"].set_linewidth(0.8)
-    ax.set_ylim(0, 1.12)
-    ax.set_yticks(np.linspace(0, 1, 6))
-    ax.set_yticklabels([f"{v:.0%}" for v in np.linspace(0, 1, 6)])
-    ax.tick_params(length=3, width=0.8)
+    ax.spines["left"].set_linewidth(0.85)
+    ax.spines["bottom"].set_linewidth(0.85)
+
+    # Increased top margin to 1.15 to accommodate bar text labels
+    ax.set_ylim(0, 1.15)
+    ticks = np.linspace(0, 1, 6)
+    ax.set_yticks(ticks)
+    ax.set_yticklabels([f"{v:.0%}" for v in ticks])
+    ax.tick_params(length=3.5, width=0.85)
 
 
-def _legend(ax, **kwargs):
-    """Consistent legend styling across all plots."""
+def _legend(ax: plt.Axes, **kwargs: Any) -> None:
+    """Adds a clean legend with consistent frame and font appearance."""
     ax.legend(
         frameon=True,
         framealpha=1.0,
@@ -63,248 +71,219 @@ def _legend(ax, **kwargs):
     )
 
 
-def _bar(ax, x, heights, width, palette_key, label, zorder=3):
-    """Draw a bar with matched face and edge colour."""
+def _bar(
+    ax: plt.Axes,
+    x: np.ndarray,
+    heights: List[float],
+    width: float,
+    palette_key: str,
+    label: Optional[str] = None,
+    zorder: int = 3,
+) -> BarContainer:
+    """Draws a themed bar chart using the project's color palette."""
     return ax.bar(
         x,
         heights,
         width,
         label=label,
-        color=PALETTE[palette_key]["face"],
-        edgecolor=PALETTE[palette_key]["edge"],
-        linewidth=0.8,
+        color=PALETTE[palette_key]["facecolor"],
+        edgecolor=PALETTE[palette_key]["edgecolor"],
+        linewidth=0.85,
         zorder=zorder,
     )
 
 
-def _removal_palette_key(idx):
-    keys = ["removal_50", "removal_100"]
-    return keys[min(idx, len(keys) - 1)]
-
-
-def _plot_baseline(results, save_dir):
-    balanced_acc = results["balanced"]["overall"]
-    balanced_class_accs = results["balanced"]["per_class"]
-
-    fig, ax = plt.subplots(figsize=(4.0, 2.8), constrained_layout=True)
+def _plot_baseline(results: Dict[str, Any], save_dir: Path) -> None:
+    """Generates the baseline performance bar chart."""
+    balanced = results["balanced"]
+    # Increased height slightly to accommodate the lower legend
+    fig, ax = plt.subplots(figsize=(4.1, 3.1), constrained_layout=True)
 
     x = np.arange(len(FULL_CLASS_NAMES))
-    bars = _bar(ax, x, balanced_class_accs, 0.6, "balanced", label=None)
+    _bar(ax, x, balanced["per_class"], 0.62, "balanced", "Per-class Accuracy")
 
     ax.axhline(
-        y=balanced_acc,
+        y=balanced["overall"],
         color=PALETTE["baseline_line"],
         linestyle="--",
-        linewidth=1.0,
-        label=f"Overall: {balanced_acc:.1%}",
+        linewidth=1.1,
+        label=f"Overall Accuracy: {balanced['overall']:.1%}",
     )
 
+    ax.set_title("Baseline Performance (Balanced Dataset)")
     ax.set_ylabel("Accuracy")
     ax.set_xticks(x)
-    ax.set_xticklabels(FULL_CLASS_NAMES)
+    ax.set_xticklabels(FULL_CLASS_NAMES, rotation=30, ha="right")
+
     _style_ax(ax)
-    _legend(ax, loc="lower right")
+    # Lowered legend to -0.28 for better spacing
+    _legend(ax, loc="upper center", bbox_to_anchor=(0.5, -0.28), ncol=2)
 
-    for bar, acc in zip(bars, balanced_class_accs):
-        ax.text(
-            bar.get_x() + bar.get_width() / 2,
-            bar.get_height() + 0.012,
-            f"{acc:.0%}",
-            ha="center",
-            va="bottom",
-            fontsize=8,
-            color="#333333",
-        )
-
-    _save(fig, save_dir, "baseline_performance")
-    plt.close()
-
-
-def _plot_class_performance(results, save_dir):
-    balanced_class_accs = results["balanced"]["per_class"]
-    tested_classes = sorted(results["imbalanced"].keys())
-
-    if not tested_classes:
-        return
-
-    removal_percentages = sorted(results["imbalanced"][tested_classes[0]].keys())
-
-    n = len(tested_classes)
-    ncols = min(n, 2)
-    nrows = (n + 1) // 2
-
-    fig, axes = plt.subplots(
-        nrows, ncols, figsize=(3.8 * ncols, 2.8 * nrows), constrained_layout=True
-    )
-
-    # Normalise axes to always be iterable
-    if n == 1:
-        axes = [axes]
-    else:
-        axes = np.array(axes).flatten()
-
-    for idx, class_idx in enumerate(tested_classes):
-        ax = axes[idx]
-
-        x_vals = [pct * 100 for pct in removal_percentages]
-        class_accs = [
-            results["imbalanced"][class_idx][pct]["per_class"][class_idx]
-            for pct in removal_percentages
-        ]
-
-        ax.plot(
-            x_vals,
-            class_accs,
-            marker="o",
-            linewidth=1.2,
-            markersize=5,
-            color=PALETTE["balanced"]["face"],
-            markeredgecolor=PALETTE["balanced"]["edge"],
-            markeredgewidth=0.8,
-            zorder=3,
-        )
-
-        ax.axhline(
-            y=balanced_class_accs[class_idx],
-            color=PALETTE["baseline_line"],
-            linestyle="--",
-            linewidth=1.0,
-            zorder=2,
-            label="Balanced baseline",
-        )
-
-        ax.set_xticks(x_vals)
-        ax.set_xticklabels([f"{int(v)}%" for v in x_vals])
-        ax.set_xlabel("Training Data Removed")
-        ax.set_ylabel("Accuracy")
-        ax.set_title(
-            FULL_CLASS_NAMES[class_idx], fontsize=9, fontweight="normal", pad=8
-        )
-        _style_ax(ax)
-        _legend(ax, loc="lower left")
-
-    # Hide any unused subplots
-    for idx in range(len(tested_classes), len(axes)):
-        axes[idx].set_visible(False)
-
-    _save(fig, save_dir, "individual_class_performance")
-    plt.close()
-
-
-def _plot_impact_matrix(results, save_dir):
-    balanced_class_accs = results["balanced"]["per_class"]
-    tested_classes = sorted(results["imbalanced"].keys())
-
-    removal_pct = sorted(results["imbalanced"][tested_classes[0]].keys())[0]
-
-    # Rows = affected class, columns = removed class
-    impact_matrix = np.zeros((4, 4))
-    for removed_class in tested_classes:
-        class_accs = results["imbalanced"][removed_class][removal_pct]["per_class"]
-        for affected_class in range(4):
-            drop = (
-                balanced_class_accs[affected_class] - class_accs[affected_class]
-            ) * 100
-            impact_matrix[affected_class, removed_class] = drop
-
-    fig, ax = plt.subplots(figsize=(3.8, 3.2), constrained_layout=True)
-
-    im = ax.imshow(
-        impact_matrix, cmap="Blues", aspect="auto", vmin=0, vmax=np.max(impact_matrix)
-    )
-
-    ax.set_xticks(range(4))
-    ax.set_xticklabels(FULL_CLASS_NAMES, rotation=45, ha="right")
-    ax.set_yticks(range(4))
-    ax.set_yticklabels(FULL_CLASS_NAMES)
-    ax.set_xlabel(f"Class Reduced ({int(removal_pct * 100)}%)")
-    ax.set_ylabel("Affected Class")
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-
-    cbar = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-    cbar.set_label("Accuracy Drop (pp)", rotation=270, labelpad=14)
-    cbar.outline.set_linewidth(0.6)
-
-    for i in range(4):
-        for j in range(4):
-            value = impact_matrix[i, j]
-            color = "white" if value > np.max(impact_matrix) / 2 else "#333333"
+    for bar in ax.patches:
+        if isinstance(bar, plt.Rectangle) and bar.get_label() != "_nolegend_":
             ax.text(
-                j, i, f"{value:.1f}", ha="center", va="center", color=color, fontsize=7
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height() + 0.02,
+                f"{bar.get_height():.0%}",
+                ha="center",
+                va="bottom",
+                fontsize=8,
             )
 
-    _save(fig, save_dir, "cross_class_impact_matrix")
-    plt.close()
+    _save(fig, save_dir, "baseline_performance")
 
 
-def _plot_summary(results, save_dir):
-    balanced_class_accs = results["balanced"]["per_class"]
+def _plot_impact_matrix(
+    results: Dict[str, Any], save_dir: Path, removal_pct: float = 0.5
+) -> None:
+    """Plots cross-class accuracy impact heatmap."""
+    balanced_accs = results["balanced"]["per_class"]
     tested_classes = sorted(results["imbalanced"].keys())
+    num_classes = len(FULL_CLASS_NAMES)
 
-    if len(tested_classes) < 2:
-        return
+    change_matrix = np.zeros((num_classes, num_classes))
+    for removed_idx in tested_classes:
+        accs = results["imbalanced"][removed_idx][removal_pct]["per_class"]
+        for affected_idx in range(num_classes):
+            change_matrix[affected_idx, removed_idx] = (
+                accs[affected_idx] - balanced_accs[affected_idx]
+            ) * 100
 
-    removal_percentages = sorted(results["imbalanced"][tested_classes[0]].keys())
+    v_limit = max(np.max(np.abs(change_matrix)), 5.0)
 
-    if not removal_percentages:
-        return
-
-    fig, ax = plt.subplots(figsize=(4.5, 2.8), constrained_layout=True)
-
-    n_conditions = len(removal_percentages) + 1
-    bar_width = 0.7 / n_conditions
-    x = np.arange(len(tested_classes))
-
-    # Centre the group of bars around each tick
-    offsets = np.linspace(
-        -(n_conditions - 1) / 2 * bar_width,
-        (n_conditions - 1) / 2 * bar_width,
-        n_conditions,
+    fig, ax = plt.subplots(figsize=(4.3, 3.7), constrained_layout=True)
+    im = ax.imshow(
+        change_matrix, cmap="RdBu", aspect="auto", vmin=-v_limit, vmax=v_limit
     )
 
-    baseline_accs = [balanced_class_accs[c] for c in tested_classes]
-    _bar(ax, x + offsets[0], baseline_accs, bar_width, "balanced", "Balanced")
+    ax.set_xticks(range(num_classes))
+    ax.set_yticks(range(num_classes))
+    ax.set_xticklabels(FULL_CLASS_NAMES, rotation=45, ha="right")
+    ax.set_yticklabels(FULL_CLASS_NAMES)
 
-    for idx, pct in enumerate(removal_percentages):
-        imbalanced_accs = [
-            results["imbalanced"][c][pct]["per_class"][c] for c in tested_classes
-        ]
-        key = _removal_palette_key(idx)
-        _bar(
-            ax,
-            x + offsets[idx + 1],
-            imbalanced_accs,
-            bar_width,
-            key,
-            f"{int(pct * 100)}% removed",
-        )
+    title_pct = f"{int(removal_pct * 100)}% Data Removal"
+    ax.set_title(f"Cross-Class Accuracy Impact\n({title_pct})")
 
+    plt.colorbar(im, ax=ax).set_label("Accuracy Change (pp)", rotation=270, labelpad=14)
+
+    for i in range(num_classes):
+        for j in range(num_classes):
+            val = change_matrix[i, j]
+            color = "white" if abs(val) > v_limit * 0.6 else "#333333"
+            ax.text(
+                j, i, f"{val:+.1f}", ha="center", va="center", color=color, fontsize=7.5
+            )
+
+    suffix = f"_{int(removal_pct * 100)}pct"
+    _save(fig, save_dir, f"cross_class_change_matrix{suffix}")
+
+
+def _plot_augmentation_summary(
+    results: Dict[str, Any], aug_results: Dict[str, Any], save_dir: Path
+) -> None:
+    """Compares baseline, imbalanced, and augmented performance in one bar chart."""
+    tested_classes = sorted(results["imbalanced"].keys())
+    pct = 0.5
+    x = np.arange(len(tested_classes))
+    width = 0.26
+
+    fig, ax = plt.subplots(figsize=(5.8, 3.6), constrained_layout=True)
+
+    baseline_vals = [results["balanced"]["per_class"][c] for c in tested_classes]
+    imb_vals = [results["imbalanced"][c][pct]["per_class"][c] for c in tested_classes]
+    aug_vals = [aug_results[c][pct]["per_class"][c] for c in tested_classes]
+
+    _bar(ax, x - width, baseline_vals, width, "balanced", "Balanced Baseline")
+    _bar(ax, x, imb_vals, width, "imbalanced", "Imbalanced (50% Removal)")
+    _bar(ax, x + width, aug_vals, width, "augmented", "Augmented (Synthetic)")
+
+    ax.set_title("Augmentation Recovery at 50% Data Removal")
     ax.set_ylabel("Accuracy")
     ax.set_xticks(x)
-    ax.set_xticklabels([FULL_CLASS_NAMES[c] for c in tested_classes])
+    ax.set_xticklabels(
+        [FULL_CLASS_NAMES[c] for c in tested_classes], rotation=30, ha="right"
+    )
+
     _style_ax(ax)
-    _legend(ax, loc="upper right")
+    # Lowered legend to -0.28 for consistency with baseline plot
+    _legend(ax, loc="upper center", bbox_to_anchor=(0.5, -0.28), ncol=3)
 
-    _save(fig, save_dir, "summary_comparison")
-    plt.close()
+    _save(fig, save_dir, "augmentation_recovery_summary")
 
 
-def plot_results(results, save_dir="plots"):
-    """
-    Generate and save all experiment plots as PDFs.
+def _plot_recovery_matrix(
+    results: Dict[str, Any],
+    aug_results: Dict[str, Any],
+    save_dir: Path,
+    pct: float = 0.5,
+) -> None:
+    """Plots the accuracy improvement matrix gained from synthetic augmentation."""
+    tested_classes = sorted(results["imbalanced"].keys())
+    num_classes = len(FULL_CLASS_NAMES)
 
-    Individual plots are skipped gracefully if the results dict does
-    not contain sufficient data to render them meaningfully.
+    change_matrix = np.zeros((num_classes, num_classes))
+    for c_idx in tested_classes:
+        imb = results["imbalanced"][c_idx][pct]["per_class"]
+        aug = aug_results[c_idx][pct]["per_class"]
+        for affected in range(num_classes):
+            change_matrix[affected, c_idx] = (aug[affected] - imb[affected]) * 100
 
-    Args:
-        results (dict): Results dict from run_experiments
-        save_dir (str): Directory to save plots. Default: "plots"
-    """
-    Path(save_dir).mkdir(exist_ok=True)
+    v_limit = max(np.max(np.abs(change_matrix)), 5.0)
+
+    fig, ax = plt.subplots(figsize=(4.4, 3.9), constrained_layout=True)
+    im = ax.imshow(
+        change_matrix, cmap="RdBu", aspect="auto", vmin=-v_limit, vmax=v_limit
+    )
+
+    ax.set_xticks(range(num_classes))
+    ax.set_yticks(range(num_classes))
+    ax.set_xticklabels(FULL_CLASS_NAMES, rotation=45, ha="right")
+    ax.set_yticklabels(FULL_CLASS_NAMES)
+
+    ax.set_title(
+        f"Accuracy Gain from Synthetic Augmentation\n({int(pct * 100)}% Removal)"
+    )
+
+    plt.colorbar(im, ax=ax).set_label("Accuracy Change (pp)", rotation=270, labelpad=14)
+
+    for i in range(num_classes):
+        for j in range(num_classes):
+            val = change_matrix[i, j]
+            color = "white" if abs(val) > v_limit * 0.6 else "#333333"
+            ax.text(
+                j, i, f"{val:+.1f}", ha="center", va="center", color=color, fontsize=7.5
+            )
+
+    suffix = f"_{int(pct * 100)}pct"
+    _save(fig, save_dir, f"augmentation_gain_matrix{suffix}")
+
+
+def plot_results(
+    results: Dict[str, Any],
+    aug_results: Optional[Dict[str, Any]] = None,
+    save_dir: str = "plots",
+) -> None:
+    """Generates all publication-ready plots with consistent styling."""
+    save_path = Path(save_dir)
+    save_path.mkdir(exist_ok=True, parents=True)
+
+    # Apply project-wide Matplotlib configuration
     plt.rcParams.update(PLOT_STYLE)
 
-    _plot_baseline(results, save_dir)
-    _plot_class_performance(results, save_dir)
-    _plot_impact_matrix(results, save_dir)
-    _plot_summary(results, save_dir)
+    try:
+        _plot_baseline(results, save_path)
+        _plot_impact_matrix(results, save_path, removal_pct=0.5)
+        _plot_impact_matrix(results, save_path, removal_pct=1.0)
+
+        if aug_results:
+            _plot_augmentation_summary(results, aug_results, save_path)
+            _plot_recovery_matrix(results, aug_results, save_path, pct=0.5)
+            _plot_recovery_matrix(results, aug_results, save_path, pct=1.0)
+
+        logging.info("Plots successfully saved to: %s", save_path.resolve())
+
+    except KeyError as e:
+        logging.error("Result dictionary missing required key: %s", e)
+    except Exception as e:
+        logging.error("An unexpected error occurred during plotting: %s", e)
+        raise
