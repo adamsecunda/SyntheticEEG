@@ -51,7 +51,6 @@ def _style_ax(ax: plt.Axes) -> None:
     ax.spines["left"].set_linewidth(0.85)
     ax.spines["bottom"].set_linewidth(0.85)
 
-    # Increased top margin to 1.15 to accommodate bar text labels
     ax.set_ylim(0, 1.15)
     ticks = np.linspace(0, 1, 6)
     ax.set_yticks(ticks)
@@ -96,8 +95,7 @@ def _bar(
 def _plot_baseline(results: Dict[str, Any], save_dir: Path) -> None:
     """Generates the baseline performance bar chart."""
     balanced = results["balanced"]
-    # Increased height slightly to accommodate the lower legend
-    fig, ax = plt.subplots(figsize=(4.1, 3.1), constrained_layout=True)
+    fig, ax = plt.subplots(figsize=(4.1, 2.8), constrained_layout=True)
 
     x = np.arange(len(FULL_CLASS_NAMES))
     _bar(ax, x, balanced["per_class"], 0.62, "balanced", "Per-class Accuracy")
@@ -110,13 +108,11 @@ def _plot_baseline(results: Dict[str, Any], save_dir: Path) -> None:
         label=f"Overall Accuracy: {balanced['overall']:.1%}",
     )
 
-    ax.set_title("Baseline Performance (Balanced Dataset)")
     ax.set_ylabel("Accuracy")
     ax.set_xticks(x)
     ax.set_xticklabels(FULL_CLASS_NAMES, rotation=30, ha="right")
 
     _style_ax(ax)
-    # Lowered legend to -0.28 for better spacing
     _legend(ax, loc="upper center", bbox_to_anchor=(0.5, -0.28), ncol=2)
 
     for bar in ax.patches:
@@ -151,7 +147,7 @@ def _plot_impact_matrix(
 
     v_limit = max(np.max(np.abs(change_matrix)), 5.0)
 
-    fig, ax = plt.subplots(figsize=(4.3, 3.7), constrained_layout=True)
+    fig, ax = plt.subplots(figsize=(4.3, 3.4), constrained_layout=True)
     im = ax.imshow(
         change_matrix, cmap="RdBu", aspect="auto", vmin=-v_limit, vmax=v_limit
     )
@@ -160,9 +156,6 @@ def _plot_impact_matrix(
     ax.set_yticks(range(num_classes))
     ax.set_xticklabels(FULL_CLASS_NAMES, rotation=45, ha="right")
     ax.set_yticklabels(FULL_CLASS_NAMES)
-
-    title_pct = f"{int(removal_pct * 100)}% Data Removal"
-    ax.set_title(f"Cross-Class Accuracy Impact\n({title_pct})")
 
     plt.colorbar(im, ax=ax).set_label("Accuracy Change (pp)", rotation=270, labelpad=14)
 
@@ -181,13 +174,13 @@ def _plot_impact_matrix(
 def _plot_augmentation_summary(
     results: Dict[str, Any], aug_results: Dict[str, Any], save_dir: Path
 ) -> None:
-    """Compares baseline, imbalanced, and augmented performance in one bar chart."""
+    """Compares baseline, imbalanced, and augmented performance."""
     tested_classes = sorted(results["imbalanced"].keys())
     pct = 0.5
     x = np.arange(len(tested_classes))
     width = 0.26
 
-    fig, ax = plt.subplots(figsize=(5.8, 3.6), constrained_layout=True)
+    fig, ax = plt.subplots(figsize=(5.8, 3.3), constrained_layout=True)
 
     baseline_vals = [results["balanced"]["per_class"][c] for c in tested_classes]
     imb_vals = [results["imbalanced"][c][pct]["per_class"][c] for c in tested_classes]
@@ -197,7 +190,6 @@ def _plot_augmentation_summary(
     _bar(ax, x, imb_vals, width, "imbalanced", "Imbalanced (50% Removal)")
     _bar(ax, x + width, aug_vals, width, "augmented", "Augmented (Synthetic)")
 
-    ax.set_title("Augmentation Recovery at 50% Data Removal")
     ax.set_ylabel("Accuracy")
     ax.set_xticks(x)
     ax.set_xticklabels(
@@ -205,7 +197,6 @@ def _plot_augmentation_summary(
     )
 
     _style_ax(ax)
-    # Lowered legend to -0.28 for consistency with baseline plot
     _legend(ax, loc="upper center", bbox_to_anchor=(0.5, -0.28), ncol=3)
 
     _save(fig, save_dir, "augmentation_recovery_summary")
@@ -230,7 +221,7 @@ def _plot_recovery_matrix(
 
     v_limit = max(np.max(np.abs(change_matrix)), 5.0)
 
-    fig, ax = plt.subplots(figsize=(4.4, 3.9), constrained_layout=True)
+    fig, ax = plt.subplots(figsize=(4.4, 3.6), constrained_layout=True)
     im = ax.imshow(
         change_matrix, cmap="RdBu", aspect="auto", vmin=-v_limit, vmax=v_limit
     )
@@ -239,10 +230,6 @@ def _plot_recovery_matrix(
     ax.set_yticks(range(num_classes))
     ax.set_xticklabels(FULL_CLASS_NAMES, rotation=45, ha="right")
     ax.set_yticklabels(FULL_CLASS_NAMES)
-
-    ax.set_title(
-        f"Accuracy Gain from Synthetic Augmentation\n({int(pct * 100)}% Removal)"
-    )
 
     plt.colorbar(im, ax=ax).set_label("Accuracy Change (pp)", rotation=270, labelpad=14)
 
@@ -267,7 +254,6 @@ def plot_results(
     save_path = Path(save_dir)
     save_path.mkdir(exist_ok=True, parents=True)
 
-    # Apply project-wide Matplotlib configuration
     plt.rcParams.update(PLOT_STYLE)
 
     try:
