@@ -143,42 +143,47 @@ def run_augmentation_experiments(X, y, results, generator, save_dir='results'):
                 json.dump(config_result, f, indent=2)
 
     return aug_results
-
 def print_imbalance_results(results, aug_results=None, class_names=None):
     if class_names is None:
         class_names = ["Left", "Right", "Feet", "Tongue"]
 
-    # Header
-    print(f"{'Configuration':<28} {'Overall':>8} {'Left':>7} {'Right':>7} {'Feet':>7} {'Tongue':>7} {'Delta (pp)':>10}")
-    print("-" * 84)
+    header = f"{'Configuration':<25} {'Overall':>8} {'Left':>7} {'Right':>7} {'Feet':>7} {'Tongue':>7} {'Delta':>9}"
+    print(header)
+    print("-" * len(header))
 
-    # 1. Balanced baseline (A_base)
+    # Balanced Baseline (A_base)
     b = results["balanced"]
-    print(f"{'Balanced baseline':<28} {b['overall']:>8.3f} "
+    print(f"{'Balanced Baseline':<25} {b['overall']:>8.3f} "
           f"{b['per_class'][0]:>7.3f} {b['per_class'][1]:>7.3f} "
-          f"{b['per_class'][2]:>7.3f} {b['per_class'][3]:>7.3f} {'-':>10}")
+          f"{b['per_class'][2]:>7.3f} {b['per_class'][3]:>7.3f} {'-':>9}")
 
-    for target_class in sorted(results["imbalanced"].keys()):
-        for removal_pct in sorted(results["imbalanced"][target_class].keys()):
+    for cls_idx in sorted(results["imbalanced"].keys()):
+        for pct in sorted(results["imbalanced"][cls_idx].keys()):
             
-            # 2. Imbalance Impact (Delta_imb = A_imb - A_base)
-            r = results["imbalanced"][target_class][removal_pct]
-            a_base = b['per_class'][target_class]
-            a_imb = r['per_class'][target_class]
-            delta_imb = (a_imb - a_base) * 100
+            # Imbalance Impact: Change after removing data (A_imb - A_base)
+            imb = results["imbalanced"][cls_idx][pct]
+            d_imb = (imb['per_class'][cls_idx] - b['per_class'][cls_idx]) * 100
             
-            tag = f"{class_names[target_class]} {int(float(removal_pct)*100)}% Imbalance"
-            print(f"{tag:<28} {r['overall']:>8.3f} "
-                  f"{r['per_class'][0]:>7.3f} {r['per_class'][1]:>7.3f} "
-                  f"{r['per_class'][2]:>7.3f} {r['per_class'][3]:>7.3f} {delta_imb:>9.1f}pp")
+            tag_imb = f"{class_names[cls_idx]} {int(float(pct)*100)}% Imbalance"
+            print(f"{tag_imb:<25} {imb['overall']:>8.3f} "
+                  f"{imb['per_class'][0]:>7.3f} {imb['per_class'][1]:>7.3f} "
+                  f"{imb['per_class'][2]:>7.3f} {imb['per_class'][3]:>7.3f} {d_imb:>8.1f}pp")
 
-            # 3. Augmentation Gain (Delta_util = A_aug - A_imb)
-            if aug_results and target_class in aug_results and removal_pct in aug_results[target_class]:
-                a = aug_results[target_class][removal_pct]
-                a_aug = a['per_class'][target_class]
-                delta_util = (a_aug - a_imb) * 100
+            if aug_results and cls_idx in aug_results and pct in aug_results[cls_idx]:
+                # Augmented State (A_aug)
+                aug = aug_results[cls_idx][pct]
                 
-                tag = f"{class_names[target_class]} {int(float(removal_pct)*100)}% Augmented"
-                print(f"{tag:<28} {a['overall']:>8.3f} "
-                      f"{a['per_class'][0]:>7.3f} {a['per_class'][1]:>7.3f} "
-                      f"{a['per_class'][2]:>7.3f} {a['per_class'][3]:>7.3f} {delta_util:>+9.1f}pp")
+                # Net Change: Final difference vs original baseline (A_aug - A_base)
+                d_net = (aug['per_class'][cls_idx] - b['per_class'][cls_idx]) * 100
+                # Augmentation Gain: Change after adding synthetic data (A_aug - A_imb)
+                d_util = (aug['per_class'][cls_idx] - imb['per_class'][cls_idx]) * 100
+                
+                tag_aug = f"{class_names[cls_idx]} {int(float(pct)*100)}% Augmented"
+                print(f"{tag_aug:<25} {aug['overall']:>8.3f} "
+                      f"{aug['per_class'][0]:>7.3f} {aug['per_class'][1]:>7.3f} "
+                      f"{aug['per_class'][2]:>7.3f} {aug['per_class'][3]:>7.3f} {d_net:>8.1f}pp")
+                
+                # Report the recovery amount from the GAN
+                print(f"{'Augmentation Gain':<25} {'':>8} {'':>7} {'':>7} {'':>7} {'':>7} {d_util:>+8.1f}pp")
+            
+            print("-" * len(header))
