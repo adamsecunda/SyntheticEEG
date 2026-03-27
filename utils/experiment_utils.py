@@ -152,7 +152,7 @@ def print_imbalance_results(results, aug_results=None, class_names=None):
     print(f"{'Configuration':<28} {'Overall':>8} {'Left':>7} {'Right':>7} {'Feet':>7} {'Tongue':>7} {'Delta (pp)':>10}")
     print("-" * 84)
 
-    # 1. Balanced baseline
+    # 1. Balanced baseline (A_base)
     b = results["balanced"]
     print(f"{'Balanced baseline':<28} {b['overall']:>8.3f} "
           f"{b['per_class'][0]:>7.3f} {b['per_class'][1]:>7.3f} "
@@ -161,24 +161,24 @@ def print_imbalance_results(results, aug_results=None, class_names=None):
     for target_class in sorted(results["imbalanced"].keys()):
         for removal_pct in sorted(results["imbalanced"][target_class].keys()):
             
-            # 2. Ablation Delta (A_imb - A_base)
+            # 2. Imbalance Impact (Delta_imb = A_imb - A_base)
             r = results["imbalanced"][target_class][removal_pct]
             a_base = b['per_class'][target_class]
             a_imb = r['per_class'][target_class]
-            abl_delta = (a_imb - a_base) * 100
+            delta_imb = (a_imb - a_base) * 100
             
-            tag = f"{class_names[target_class]} -{int(float(removal_pct)*100)}% rem"
+            tag = f"{class_names[target_class]} {int(float(removal_pct)*100)}% Imbalance"
             print(f"{tag:<28} {r['overall']:>8.3f} "
                   f"{r['per_class'][0]:>7.3f} {r['per_class'][1]:>7.3f} "
-                  f"{r['per_class'][2]:>7.3f} {r['per_class'][3]:>7.3f} {abl_delta:>9.1f}pp")
+                  f"{r['per_class'][2]:>7.3f} {r['per_class'][3]:>7.3f} {delta_imb:>9.1f}pp")
 
-            # 3. Augmentation Gain (A_aug - A_imb)
+            # 3. Augmentation Gain (Delta_util = A_aug - A_imb)
             if aug_results and target_class in aug_results and removal_pct in aug_results[target_class]:
                 a = aug_results[target_class][removal_pct]
                 a_aug = a['per_class'][target_class]
-                aug_gain = (a_aug - a_imb) * 100
+                delta_util = (a_aug - a_imb) * 100
                 
-                tag = f"{class_names[target_class]} -{int(float(removal_pct)*100)}% aug"
+                tag = f"{class_names[target_class]} {int(float(removal_pct)*100)}% Augmented"
                 print(f"{tag:<28} {a['overall']:>8.3f} "
                       f"{a['per_class'][0]:>7.3f} {a['per_class'][1]:>7.3f} "
-                      f"{a['per_class'][2]:>7.3f} {a['per_class'][3]:>7.3f} {aug_gain:>+9.1f}pp")
+                      f"{a['per_class'][2]:>7.3f} {a['per_class'][3]:>7.3f} {delta_util:>+9.1f}pp")
